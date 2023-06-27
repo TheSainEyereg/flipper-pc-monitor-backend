@@ -1,0 +1,13 @@
+[package]
+name = "flipper-pc-monitor-backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+btleplug = "0.10.5"
+futures = "0.3.28"
+sysinfo = "0.29.2"
+tokio = { version = "1.28.2", features = ["full"] }
+uuid = "1.4.0"
