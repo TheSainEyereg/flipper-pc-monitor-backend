@@ -12,14 +12,19 @@ mod system_info;
 
 async fn data_sender(flipper: Peripheral) {
     // TODO: AMD (suck) support
-    let systeminfo = serde_json::to_string(&system_info::SystemInfo::get_system_info().await).unwrap();
+    let mut systeminfo = serde_json::to_string(&system_info::SystemInfo::get_system_info().await).unwrap();
     let chars = flipper.characteristics();
     let cmd_char = chars
         .iter()
         .find(|c| c.uuid == flipper_manager::FLIPPER_CHARACTERISTIC_UUID)
         .expect("Flipper Characteristic not found");
     println!("Writing {:?} to Flipper", systeminfo.as_bytes());
-    flipper.write(cmd_char, systeminfo.as_bytes(), btleplug::api::WriteType::WithoutResponse).await.expect("Failed to write to Flipper");
+
+    let mut systeminfo_bytes = systeminfo.as_bytes().to_vec();
+    systeminfo_bytes.push(b'\0');
+
+    flipper.write(cmd_char, &systeminfo_bytes, 
+        btleplug::api::WriteType::WithoutResponse).await.expect("Failed to write to Flipper");
 }
 
 #[tokio::main]
