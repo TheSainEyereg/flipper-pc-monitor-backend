@@ -42,7 +42,7 @@ async fn get_flipper(central: &Adapter, id: PeripheralId) -> Option<Peripheral> 
 }
 
 async fn data_sender(flipper: Peripheral) {
-    Ok(())
+    
 }
 
 #[tokio::main]
