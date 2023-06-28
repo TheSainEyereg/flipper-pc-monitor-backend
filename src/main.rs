@@ -20,10 +20,7 @@ async fn data_sender(flipper: Peripheral) {
         .expect("Flipper Characteristic not found");
     println!("Writing {:?} to Flipper", systeminfo.as_bytes());
 
-    let mut systeminfo_bytes = systeminfo.as_bytes().to_vec();
-    systeminfo_bytes.extend_from_slice(&[0x00, 0xF0, 0xAA]);
-
-    flipper.write(cmd_char, &systeminfo_bytes, 
+    flipper.write(cmd_char, systeminfo.as_bytes(), 
         btleplug::api::WriteType::WithoutResponse).await.expect("Failed to write to Flipper");
 }
 
