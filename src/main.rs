@@ -7,11 +7,13 @@ use btleplug::api::{
 use btleplug::platform::{Manager, Peripheral};
 use futures::stream::StreamExt;
 
-
 mod flipper_manager;
+mod system_info;
 
 async fn data_sender(flipper: Peripheral) {
-    
+    // TODO: AMD (suck) support
+    let systeminfo = serde_json::to_string(&system_info::SystemInfo::get_system_info().await).unwrap();
+
 }
 
 #[tokio::main]
