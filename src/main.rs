@@ -5,58 +5,28 @@ use btleplug::api::{
 };
 use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
 use futures::stream::StreamExt;
+use tokio::sync::RwLock;
+use std::borrow::BorrowMut;
+use std::cell::{RefCell};
+use std::sync::{Arc, Mutex};
 use std::error::Error;
-use uuid::Uuid;
 use std::rc::Rc;
-use std::cell::RefCell;
+use uuid::Uuid;
 
 const FLIPPER_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x19ed82ae_ed21_4c9d_4145_228e62fe0000);
 
-#[derive(Clone)]
-enum FlipperState {
-    Discovered,
-    Connected,
-    Lost,
-}
-
-#[derive(Clone)]
-struct FlipperManager {
-    flipper: Rc<RefCell<Option<Peripheral>>>,
-    flipper_state: Rc<RefCell<FlipperState>>,
-}
-
-impl FlipperManager {
-    pub fn new() -> Self {
-        FlipperManager {
-			flipper: ((Rc::new(RefCell::from(None)))),
-			flipper_state: (Rc::new(RefCell::from(FlipperState::Lost))),
-		}
-    }
-
-    pub fn set_flipper(&mut self, ph: Peripheral) {
-        *self.flipper.borrow_mut() = Some(ph);
-    }
-
-    pub fn set_state(&mut self, state: FlipperState) {
-        *self.flipper_state.borrow_mut() = state;
-    }
-
-    pub fn is_state(&self, _state: FlipperState) -> bool {
-        matches!(self.flipper_state.borrow(), _state)
-    }
-
-    pub fn is_flipper_id(&self, id: PeripheralId) -> bool {
-        self.flipper.borrow().as_ref().and_then(|flp| Some(flp.id() == id)).unwrap()
-    }
-}
-
 async fn get_central(manager: &Manager) -> Adapter {
-    let adapters = manager.adapters().await.unwrap();
-    adapters.into_iter().nth(0).unwrap()
+    manager
+        .adapters()
+        .await
+        .unwrap()
+        .into_iter()
+        .nth(0)
+        .unwrap()
 }
 
-async fn find_flipper(central: &Adapter) -> Option<Peripheral> {
-    for p in central.peripherals().await.unwrap() {
+async fn get_flipper(central: &Adapter, id: PeripheralId) -> Option<Peripheral> {
+    for p in central.peripherals().await.unwrap().iter().filter(|p| p.id() == id) {
         if p.properties()
             .await
             .unwrap()
@@ -65,17 +35,15 @@ async fn find_flipper(central: &Adapter) -> Option<Peripheral> {
             .iter()
             .any(|name| name.contains("Flipper"))
         {
-            return Some(p);
+            return Some(p.clone());
         }
     }
     None
 }
 
-async fn data_sender(manager: FlipperManager) -> Result<(), Box<dyn Error>> {
-	
+async fn data_sender(flipper: Peripheral) {
     Ok(())
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -87,34 +55,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     central.start_scan(ScanFilter::default()).await?;
 
-    let mut manager = FlipperManager::new();
-
     while let Some(event) = events.next().await {
         match event {
             CentralEvent::DeviceDiscovered(id) => {
-				if manager.is_state(FlipperState::Discovered) { continue }
-				manager.set_state(FlipperState::Discovered);
-
-				manager.set_flipper(find_flipper(&central).await.unwrap());
-
-                manager.flipper.borrow().as_ref().unwrap().connect().await.expect("Cannot connect to device");
+                if let Some(flp) = get_flipper(&central, id).await {
+                    flp.connect().await.expect(format!("Failed to connect to Flipper {}", id).as_str());
+                }
             }
             CentralEvent::DeviceConnected(id) => {
-				if manager.is_state(FlipperState::Connected) || manager.is_flipper_id(id) { continue }
-				manager.set_state(FlipperState::Connected);
-                
-                if let Some(flp) = manager.flipper.borrow_mut().as_mut() {
+                if let Some(flp) = get_flipper(&central, id).await {
                     flp.discover_services().await?;
-
-					tokio::spawn(async {
-						// data_sender( manager.clone() ).await;
-					});
-                }
-				
-			}
-            CentralEvent::DeviceDisconnected(id) => {
-				if manager.is_state(FlipperState::Lost) || manager.is_flipper_id(id) { continue }
-				manager.set_state(FlipperState::Lost);
+                    tokio::spawn(data_sender(flp));
+                };
             }
             _ => {}
         }
