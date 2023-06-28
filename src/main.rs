@@ -12,11 +12,6 @@ use std::cell::RefCell;
 
 const FLIPPER_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x19ed82ae_ed21_4c9d_4145_228e62fe0000);
 
-async fn get_central(manager: &Manager) -> Adapter {
-    let adapters = manager.adapters().await.unwrap();
-    adapters.into_iter().nth(0).unwrap()
-}
-
 #[derive(Clone)]
 enum FlipperState {
     Discovered,
@@ -27,30 +22,60 @@ enum FlipperState {
 #[derive(Clone)]
 struct FlipperManager {
     flipper: Rc<RefCell<Option<Peripheral>>>,
-    flipper_state: Rc<RefCell<FlipperState>>
+    flipper_state: Rc<RefCell<FlipperState>>,
 }
 
 impl FlipperManager {
     pub fn new() -> Self {
-        FlipperManager { flipper: ((Rc::new(RefCell::from(None)))), flipper_state: (Rc::new(RefCell::from(FlipperState::Lost))) }
+        FlipperManager {
+			flipper: ((Rc::new(RefCell::from(None)))),
+			flipper_state: (Rc::new(RefCell::from(FlipperState::Lost))),
+		}
     }
 
     pub fn set_flipper(&mut self, ph: Peripheral) {
         *self.flipper.borrow_mut() = Some(ph);
     }
 
-    pub fn is_state(&self, _state: FlipperState) -> bool {
-        matches!(self.flipper_state.borrow(), _state)
-    }
-
     pub fn set_state(&mut self, state: FlipperState) {
         *self.flipper_state.borrow_mut() = state;
+    }
+
+    pub fn is_state(&self, _state: FlipperState) -> bool {
+        matches!(self.flipper_state.borrow(), _state)
     }
 
     pub fn is_flipper_id(&self, id: PeripheralId) -> bool {
         self.flipper.borrow().as_ref().and_then(|flp| Some(flp.id() == id)).unwrap()
     }
 }
+
+async fn get_central(manager: &Manager) -> Adapter {
+    let adapters = manager.adapters().await.unwrap();
+    adapters.into_iter().nth(0).unwrap()
+}
+
+async fn find_flipper(central: &Adapter) -> Option<Peripheral> {
+    for p in central.peripherals().await.unwrap() {
+        if p.properties()
+            .await
+            .unwrap()
+            .unwrap()
+            .local_name
+            .iter()
+            .any(|name| name.contains("Flipper"))
+        {
+            return Some(p);
+        }
+    }
+    None
+}
+
+async fn data_sender(manager: FlipperManager) -> Result<(), Box<dyn Error>> {
+	
+    Ok(())
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -62,7 +87,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     central.start_scan(ScanFilter::default()).await?;
 
-    let mut manager: FlipperManager = FlipperManager::new();
+    let mut manager = FlipperManager::new();
 
     while let Some(event) = events.next().await {
         match event {
@@ -80,6 +105,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 
                 if let Some(flp) = manager.flipper.borrow_mut().as_mut() {
                     flp.discover_services().await?;
+
+					tokio::spawn(async {
+						// data_sender( manager.clone() ).await;
+					});
                 }
 				
 			}
@@ -92,20 +121,4 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
-}
-
-async fn find_flipper(central: &Adapter) -> Option<Peripheral> {
-    for p in central.peripherals().await.unwrap() {
-        if p.properties()
-            .await
-            .unwrap()
-            .unwrap()
-            .local_name
-            .iter()
-            .any(|name| name.contains("Flipper"))
-        {
-            return Some(p);
-        }
-    }
-    None
 }
