@@ -1,3 +1,20 @@
-pub fn avg_vecu32 (v: Vec<u32>) -> u32 { v.iter().sum::<u32>() / v.len() as u32 }
+pub fn avg_vecu32(v: Vec<u32>) -> u32 {
+    v.iter().sum::<u32>() / v.len() as u32
+}
 
-pub fn pop_4u8 (barry: &[u8]) -> [u8; 4] {  [barry, &[0, 0, 0, 0]].concat().try_into().expect("slice with incorrect length") }
+pub fn pop_4u8(barry: &[u8]) -> [u8; 4] {
+    [barry, &[0, 0, 0, 0]].concat()[0..4]
+        .try_into()
+        .expect("Invalid slice size")
+}
+
+pub fn nvd_r2u32(res: &str) -> u32 {
+    let mut chars = res.chars();
+    chars.next();
+    chars.next_back();
+
+    chars.as_str().split(" ").collect::<Vec<&str>>()[0]
+        .trim()
+        .parse()
+        .unwrap()
+}

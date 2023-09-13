@@ -1,35 +1,45 @@
 #![feature(if_let_guard)]
 
-use std::error::Error;
-use std::env;
 use btleplug::api::{
-    Central, CentralEvent, Manager as _, Peripheral as _, ScanFilter, Characteristic,
+    Central, CentralEvent, Characteristic, Manager as _, Peripheral as _, ScanFilter,
 };
 use btleplug::platform::{Manager, Peripheral};
 use futures::stream::StreamExt;
+use std::error::Error;
 
 mod flipper_manager;
-mod system_info;
 mod helpers;
+mod system_info;
 
 async fn data_sender(flipper: Peripheral) {
-    let chars = flipper.characteristics();
-    let cmd_char = chars
-        .iter()
-        .find(|c| c.uuid == flipper_manager::FLIPPER_CHARACTERISTIC_UUID)
-        .expect("Flipper Characteristic not found");
+    loop {
+        let chars = flipper.characteristics();
+        let cmd_char = chars
+            .iter()
+            .find(|c| c.uuid == flipper_manager::FLIPPER_CHARACTERISTIC_UUID)
+            .expect("Flipper Characteristic not found");
 
-    let mut systeminfo_bytes = bincode::serialize(&system_info::SystemInfo::get_system_info().await).unwrap();
-    systeminfo_bytes.extend_from_slice(&[0x00, 0xF0, 0xAA]);
-    println!("Writing {:?} to Flipper", systeminfo_bytes);
+        let systeminfo = system_info::SystemInfo::get_system_info().await;
+        let systeminfo_bytes = bincode::serialize(&systeminfo).unwrap();
+        println!("Writing {:?} to Flipper", systeminfo_bytes);
 
-    flipper.write(cmd_char, &systeminfo_bytes, btleplug::api::WriteType::WithoutResponse).await.expect("Failed to write to Flipper");
+        flipper
+            .write(
+                cmd_char,
+                &systeminfo_bytes,
+                btleplug::api::WriteType::WithoutResponse,
+            )
+            .await
+            .expect("Failed to write to Flipper");
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
-	env::set_var("RUST_BACKTRACE", "1");
+    std::env::set_var("RUST_BACKTRACE", "full");
 
     let manager = Manager::new().await?;
 
@@ -47,22 +57,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("Device Discovered: {}", &id.to_string());
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     println!("Connecting to Flipper {}", &id.to_string());
-                    flp.connect().await.expect(format!("Failed to connect to Flipper {}", id.to_string()).as_str());
+                    match flp.connect().await {
+                        Err(_) => println!("Failed to connect to Flipper {}", id.to_string()),
+                        _ => {}
+                    }
                 }
             }
             CentralEvent::DeviceConnected(id) => {
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
-                    println!("Connected to Flipper {}\nDiscover Services", &id.to_string());
+                    println!(
+                        "Connected to Flipper {}\nDiscover Services",
+                        &id.to_string()
+                    );
                     flp.discover_services().await?;
                     println!("Services Discovered");
 
-                    // tokio::spawn(data_sender(flp));
-					data_sender(flp).await;
+                    tokio::spawn(data_sender(flp));
                 };
             }
             _ => {}
         }
     }
-
     Ok(())
 }
