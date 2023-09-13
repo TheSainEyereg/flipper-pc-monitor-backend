@@ -12,6 +12,8 @@ mod helpers;
 mod system_info;
 
 async fn data_sender(flipper: Peripheral) {
+    println!("Now you can launch PC Monitor app on your Flipper");
+
     loop {
         let chars = flipper.characteristics();
         let cmd_char = chars
@@ -21,7 +23,7 @@ async fn data_sender(flipper: Peripheral) {
 
         let systeminfo = system_info::SystemInfo::get_system_info().await;
         let systeminfo_bytes = bincode::serialize(&systeminfo).unwrap();
-        println!("Writing {:?} to Flipper", systeminfo_bytes);
+        // println!("Writing {:?} to Flipper", systeminfo_bytes);
 
         flipper
             .write(
@@ -39,7 +41,7 @@ async fn data_sender(flipper: Peripheral) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
-    std::env::set_var("RUST_BACKTRACE", "full");
+    // std::env::set_var("RUST_BACKTRACE", "full");
 
     let manager = Manager::new().await?;
 
@@ -54,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     while let Some(event) = events.next().await {
         match event {
             CentralEvent::DeviceDiscovered(id) => {
-                println!("Device Discovered: {}", &id.to_string());
+                // println!("Device Discovered: {}", &id.to_string());
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     println!("Connecting to Flipper {}", &id.to_string());
                     match flp.connect().await {
@@ -65,10 +67,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             CentralEvent::DeviceConnected(id) => {
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
-                    println!(
-                        "Connected to Flipper {}\nDiscover Services",
-                        &id.to_string()
-                    );
+                    println!("Connected to Flipper {}", &id.to_string());
                     flp.discover_services().await?;
                     println!("Services Discovered");
 
