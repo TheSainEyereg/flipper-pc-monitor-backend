@@ -45,7 +45,6 @@ impl SystemInfo {
         let mut system_info = sysinfo::System::new_all();
         system_info.refresh_all();
         let base: u64 = 1024;
-        let vram_mult: u64 = u64::pow(base, 2); // MiB
 
         let ram_max = system_info.total_memory();
         let ram_exp: u8 = match ram_max {
@@ -57,6 +56,7 @@ impl SystemInfo {
         };
 
         let gpu_info = GpuInfo::get_gpu_info().await;
+        let vram_mult: u64 = u64::pow(base, 2); // MiB
 
         let vram_max = match &gpu_info {
             Some(gi) => nvd_r2u32(&gi.vram_max) as u64 * vram_mult,
@@ -88,7 +88,7 @@ impl SystemInfo {
             },
             vram_max: (vram_max as f64 / u64::pow(base, vram_exp as u32) as f64 * 10.0) as u16,
             vram_usage: match &gpu_info {
-                Some(gi) => nvd_r2u32(&gi.vram_usage) as u8,
+                Some(gi) => (nvd_r2u32(&gi.vram_used) as f64 * vram_mult as f64 / vram_max as f64 * 100.0) as u8,
                 None => u8::MAX,
             },
             vram_unit: pop_4u8(Self::get_unit(vram_exp).as_bytes()),
@@ -99,8 +99,8 @@ impl SystemInfo {
 #[derive(Serialize, Debug, Clone)]
 pub struct GpuInfo {
     pub gpu_usage: String,
-    pub vram_usage: String,
     pub vram_max: String,
+    pub vram_used: String,
 }
 
 impl GpuInfo {
@@ -125,8 +125,8 @@ impl GpuInfo {
                 let g = json["nvidia_smi_log"]["gpu"].to_owned();
                 Some(GpuInfo {
                     vram_max: (g["fb_memory_usage"]["total"].to_string()),
-                    vram_usage: (g["utilization"]["memory_util"].to_string()),
                     gpu_usage: (g["utilization"]["gpu_util"].to_string()),
+                    vram_used: (g["fb_memory_usage"]["used"].to_string()),
                 })
             }
             Err(_) => None,
