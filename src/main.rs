@@ -5,6 +5,7 @@ use btleplug::api::{
 };
 use btleplug::platform::{Manager, Peripheral};
 use futures::stream::StreamExt;
+use std::collections::HashMap;
 use std::error::Error;
 
 mod flipper_manager;
@@ -53,6 +54,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Scanning...");
     central.start_scan(ScanFilter::default()).await?;
 
+	let mut workers = HashMap::new();
+
     while let Some(event) = events.next().await {
         match event {
             CentralEvent::DeviceDiscovered(id) => {
@@ -67,12 +70,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             CentralEvent::DeviceConnected(id) => {
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
-                    println!("Connected to Flipper {}", &id.to_string());
                     flp.discover_services().await?;
-                    println!("Services Discovered");
+                    println!("Connected to Flipper {}", &id.to_string());
 
-                    tokio::spawn(data_sender(flp));
+					workers.insert(id, tokio::spawn(data_sender(flp)));
                 };
+            }
+            CentralEvent::DeviceDisconnected(id) => {
+				match workers.get(&id) {
+					Some(worker) => {
+						worker.abort();
+						println!("Disconnected from Flipper {}", &id.to_string());
+						
+						workers.remove(&id);
+					},
+					None => {}
+				};
             }
             _ => {}
         }
