@@ -1,5 +1,3 @@
-#![feature(if_let_guard)]
-
 use btleplug::api::{
     Central, CentralEvent, Characteristic, Manager as _, Peripheral as _, ScanFilter,
 };
