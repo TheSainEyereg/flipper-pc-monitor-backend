@@ -109,12 +109,13 @@ pub struct GpuInfo {
 impl GpuInfo {
     pub async fn get_gpu_info() -> Option<Self> {
         // TODO: AMD support
-        let mut cmd = tokio::process::Command::new("nvidia-smi")
+        let Ok(mut cmd) = tokio::process::Command::new("nvidia-smi")
             .arg("-q")
             .arg("-x")
             .stdout(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
+            .spawn() else {
+				return None;
+			};
 
         let stdout = cmd.stdout.take().unwrap();
         let mut stdout_reader = tokio::io::BufReader::new(stdout);
