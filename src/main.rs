@@ -11,15 +11,19 @@ mod helpers;
 mod system_info;
 
 async fn data_sender(flipper: Peripheral) {
+    let chars = flipper.characteristics();
+    let cmd_char = match chars
+        .iter()
+        .find(|c| c.uuid == flipper_manager::FLIPPER_CHARACTERISTIC_UUID)
+    {
+        Some(c) => c,
+        None => {
+            return println!("Failed to find characteristic");
+        }
+    };
     println!("Now you can launch PC Monitor app on your Flipper");
 
     loop {
-        let chars = flipper.characteristics();
-        let cmd_char = chars
-            .iter()
-            .find(|c| c.uuid == flipper_manager::FLIPPER_CHARACTERISTIC_UUID)
-            .expect("Flipper Characteristic not found");
-
         let systeminfo = system_info::SystemInfo::get_system_info().await;
         let systeminfo_bytes = bincode::serialize(&systeminfo).unwrap();
         // println!("Writing {:?} to Flipper", systeminfo_bytes);
@@ -52,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Scanning...");
     central.start_scan(ScanFilter::default()).await?;
 
-	let mut workers = HashMap::new();
+    let mut workers = HashMap::new();
 
     while let Some(event) = events.next().await {
         match event {
@@ -71,19 +75,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     flp.discover_services().await?;
                     println!("Connected to Flipper {}", &id.to_string());
 
-					workers.insert(id, tokio::spawn(data_sender(flp)));
+                    workers.insert(id, tokio::spawn(data_sender(flp)));
                 };
             }
             CentralEvent::DeviceDisconnected(id) => {
-				match workers.get(&id) {
-					Some(worker) => {
-						worker.abort();
-						println!("Disconnected from Flipper {}", &id.to_string());
-						
-						workers.remove(&id);
-					},
-					None => {}
-				};
+                match workers.get(&id) {
+                    Some(worker) => {
+                        worker.abort();
+                        println!("Disconnected from Flipper {}", &id.to_string());
+
+                        workers.remove(&id);
+                    }
+                    None => {}
+                };
             }
             _ => {}
         }

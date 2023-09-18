@@ -63,10 +63,10 @@ impl SystemInfo {
             None => 0,
         };
         let vram_exp: u8 = match vram_max {
-            _ if vram_max > u64::pow(base, 4) => 4,
-            _ if vram_max > u64::pow(base, 3) => 3,
-            _ if vram_max > u64::pow(base, 2) => 2,
-            _ if vram_max > base => 1,
+            x if x > u64::pow(base, 4) => 4,
+            x if x > u64::pow(base, 3) => 3,
+            x if x > u64::pow(base, 2) => 2,
+            x if x > base => 1,
             _ => 0,
         };
 
@@ -88,7 +88,10 @@ impl SystemInfo {
             },
             vram_max: (vram_max as f64 / u64::pow(base, vram_exp as u32) as f64 * 10.0) as u16,
             vram_usage: match &gpu_info {
-                Some(gi) => (nvd_r2u32(&gi.vram_used) as f64 * vram_mult as f64 / vram_max as f64 * 100.0) as u8,
+                Some(gi) => {
+                    (nvd_r2u32(&gi.vram_used) as f64 * vram_mult as f64 / vram_max as f64 * 100.0)
+                        as u8
+                }
                 None => u8::MAX,
             },
             vram_unit: pop_4u8(Self::get_unit(vram_exp).as_bytes()),

@@ -3,9 +3,7 @@ pub fn avg_vecu32(v: Vec<u32>) -> u32 {
 }
 
 pub fn pop_4u8(barry: &[u8]) -> [u8; 4] {
-    [barry, &[0, 0, 0, 0]].concat()[0..4]
-        .try_into()
-        .expect("Invalid slice size")
+    [barry, &[0, 0, 0, 0]].concat()[0..4].try_into().unwrap()
 }
 
 pub fn nvd_r2u32(res: &str) -> u32 {

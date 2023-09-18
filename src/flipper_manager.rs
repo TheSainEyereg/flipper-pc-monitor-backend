@@ -3,7 +3,6 @@ use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
 use futures::stream::StreamExt;
 use uuid::Uuid;
 
-// TODO: Use this or remove (-_-)
 pub const FLIPPER_CHARACTERISTIC_UUID: Uuid =
     Uuid::from_u128(0x19ed82ae_ed21_4c9d_4145_228e62fe0000);
 
