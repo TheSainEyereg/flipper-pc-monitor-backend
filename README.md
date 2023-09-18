@@ -5,4 +5,5 @@ Backend for flipper-pc-monitor written in Rust
 Please note that GPU info is only displayed on Nvidia cards
 
 ### Screenshot
-![app](https://github.com/TheSainEyereg/flipper-pc-monitor-backend/assets/37226226/0433a33c-ea44-4672-82f2-7abc99833c28)
+
+![app](.github/screenshots/app.png)
