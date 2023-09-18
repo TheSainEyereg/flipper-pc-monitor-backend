@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Install deps
-        run: sudo apt install libdbus-1-dev pkg-config
+        run: sudo apt-get install libdbus-1-dev pkg-config
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.4.3
         env:
