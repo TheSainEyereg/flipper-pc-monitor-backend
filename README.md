@@ -1,3 +1,4 @@
+[![built with Codeium](https://codeium.com/badges/main)](https://codeium.com)
 # flipper-pc-monitor-backend
 Backend for flipper-pc-monitor written in Rust
 
