@@ -16,7 +16,7 @@ pub async fn get_central(manager: &Manager) -> Adapter {
         .unwrap()
 }
 
-pub async fn get_flipper(central: &Adapter, id: &PeripheralId, flipperName: String) -> Option<Peripheral> {
+pub async fn get_flipper(central: &Adapter, id: &PeripheralId, flipper_name: String) -> Option<Peripheral> {
     for p in central
         .peripherals()
         .await
@@ -30,7 +30,7 @@ pub async fn get_flipper(central: &Adapter, id: &PeripheralId, flipperName: Stri
             .unwrap()
             .local_name
             .iter()
-            .any(|name| name.contains(&flipperName))
+            .any(|name| name.contains(&flipper_name))
         {
             return Some(p.clone());
         }

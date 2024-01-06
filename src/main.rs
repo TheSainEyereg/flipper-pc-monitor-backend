@@ -54,15 +54,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!();
 
     let mut events = central.events().await?;
-    let mut flipperName = String::new();
+    let mut flipper_name = String::new();
     println!("- Scan will be searching for Flippers with a name that contains the string you enter here");
     println!("- If you run official firmware you should be fine by entering 'Flipper' (case sensitive)");
     println!("- Empty string will search for all possible Flippers (experimental)");
     println!();
     print!("Enter the name (for empty just press Enter): ");
     io::stdout().flush().unwrap();
-    io::stdin().read_line(&mut flipperName).expect("Error: unable to read user input");
-    let flipperName = flipperName.trim();
+    io::stdin().read_line(&mut flipper_name).expect("Error: unable to read user input");
+    let flipper_name = flipper_name.trim();
     println!();
 
     println!("Scanning...");
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match event {
             CentralEvent::DeviceDiscovered(id) => {
                 // println!("Device Discovered: {}", &id.to_string());
-                if let Some(flp) = flipper_manager::get_flipper(&central, &id, (&flipperName).to_string()).await {
+                if let Some(flp) = flipper_manager::get_flipper(&central, &id, (&flipper_name).to_string()).await {
                     println!("Connecting to Flipper {}", &id.to_string());
                     match flp.connect().await {
                         Err(_) => println!("Failed to connect to Flipper {}", id.to_string()),
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             CentralEvent::DeviceConnected(id) => {
-                if let Some(flp) = flipper_manager::get_flipper(&central, &id, (&flipperName).to_string()).await {
+                if let Some(flp) = flipper_manager::get_flipper(&central, &id, (&flipper_name).to_string()).await {
                     flp.discover_services().await?;
                     println!("Connected to Flipper {}", &id.to_string());
 
