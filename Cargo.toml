@@ -11,7 +11,7 @@ btleplug = "0.10.5"
 futures = "0.3.28"
 pretty_env_logger = "0.5.0"
 serde = { version = "1.0.164", features = ["derive"] }
-sysinfo = "0.29.2"
+sysinfo = "0.30.5"
 tokio = { version = "1.28.2", features = ["full"] }
 uuid = "1.4.0"
 xmltojson = { git = "https://github.com/rtyler/xmltojson", version = "0.1.3" }

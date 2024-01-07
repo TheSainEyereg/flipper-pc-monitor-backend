@@ -6,6 +6,7 @@ use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::{self, Write};
+use sysinfo::{System};
 
 mod flipper_manager;
 mod helpers;
@@ -23,9 +24,11 @@ async fn data_sender(flipper: Peripheral) {
         }
     };
     println!("Now you can launch PC Monitor app on your Flipper");
-
+    
+    // Reuse system variable in loop (small performance and RAM boost)
+    let mut system_info = sysinfo::System::new_all();
     loop {
-        let systeminfo = system_info::SystemInfo::get_system_info().await;
+        let systeminfo = system_info::SystemInfo::get_system_info(&mut system_info).await;
         let systeminfo_bytes = bincode::serialize(&systeminfo).unwrap();
         // println!("Writing {:?} to Flipper", systeminfo_bytes);
 
