@@ -70,6 +70,8 @@ impl SystemInfo {
             _ => 0,
         };
 
+        // Refresh CPU before reading to get correct values
+        system_info.refresh_cpu();
         SystemInfo {
             cpu_usage: avg_vecu32(
                 system_info
