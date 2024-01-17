@@ -1,6 +1,6 @@
 use crate::helpers::{avg_vecu32, nvd_r2u32, pop_4u8};
 use serde::Serialize;
-use sysinfo::{CpuExt, SystemExt};
+use sysinfo::{System, MemoryRefreshKind};
 use tokio::io::AsyncReadExt;
 
 /*
@@ -41,9 +41,10 @@ impl SystemInfo {
         .to_owned()
     }
 
-    pub async fn get_system_info() -> Self {
-        let mut system_info = sysinfo::System::new_all();
-        system_info.refresh_all();
+    pub async fn get_system_info(system_info: &mut sysinfo::System) -> Self {
+        // Need to refresh only CPU and RAM => big boost when combined with reusing system_info
+        // system_info.refresh_all();
+        system_info.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
         let base: u64 = 1024;
 
         let ram_max = system_info.total_memory();
@@ -70,8 +71,8 @@ impl SystemInfo {
             _ => 0,
         };
 
-        // Refresh CPU before reading to get correct values
-        system_info.refresh_cpu();
+        // Refresh only CPU usage before reading
+        system_info.refresh_cpu_usage();
         SystemInfo {
             cpu_usage: avg_vecu32(
                 system_info
