@@ -1,0 +1,33 @@
+name: Build release
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Temporarily modify the rust toolchain version
+      run: rustup override set nightly
+    - name: Build
+      run: cargo build --release
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: flipper-pc-monitor-backend
+        path: target/release/flipper-pc-monitor-backend
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Temporarily modify the rust toolchain version
+      run: rustup override set nightly
+    - name: Build
+      run: cargo build --release
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: flipper-pc-monitor-backend.exe
+        path: target/release/flipper-pc-monitor-backend.exe
