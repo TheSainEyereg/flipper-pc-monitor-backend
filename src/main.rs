@@ -1,12 +1,8 @@
-use btleplug::api::{
-    Central, CentralEvent, Characteristic, Manager as _, Peripheral as _, ScanFilter,
-};
+use btleplug::api::{Central, CentralEvent, Peripheral as _, ScanFilter};
 use btleplug::platform::{Manager, Peripheral};
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::error::Error;
-use std::io::{self, Write};
-use sysinfo::{System};
 
 mod flipper_manager;
 mod helpers;
@@ -24,7 +20,7 @@ async fn data_sender(flipper: Peripheral) {
         }
     };
     println!("Now you can launch PC Monitor app on your Flipper");
-    
+
     // Reuse system variable in loop (small performance and RAM boost)
     let mut system_info = sysinfo::System::new_all();
     loop {
@@ -57,16 +53,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!();
 
     let mut events = central.events().await?;
-    let mut flipper_name = String::new();
-    println!("- Scan will be searching for Flippers with a name that contains the string you enter here");
-    println!("- If you run official firmware you should be fine by entering 'Flipper' (case sensitive)");
-    println!("- Empty string will search for all possible Flippers (experimental)");
-    println!();
-    print!("Enter the name (for empty just press Enter): ");
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(&mut flipper_name).expect("Error: unable to read user input");
-    let flipper_name = flipper_name.trim();
-    println!();
 
     println!("Scanning...");
     central.start_scan(ScanFilter::default()).await?;
@@ -77,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match event {
             CentralEvent::DeviceDiscovered(id) => {
                 // println!("Device Discovered: {}", &id.to_string());
-                if let Some(flp) = flipper_manager::get_flipper(&central, &id, (&flipper_name).to_string()).await {
+                if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     println!("Connecting to Flipper {}", &id.to_string());
                     match flp.connect().await {
                         Err(_) => println!("Failed to connect to Flipper {}", id.to_string()),
@@ -86,7 +72,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             CentralEvent::DeviceConnected(id) => {
-                if let Some(flp) = flipper_manager::get_flipper(&central, &id, (&flipper_name).to_string()).await {
+                if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     flp.discover_services().await?;
                     println!("Connected to Flipper {}", &id.to_string());
 

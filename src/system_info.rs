@@ -1,6 +1,6 @@
 use crate::helpers::{avg_vecu32, nvd_r2u32, pop_4u8};
 use serde::Serialize;
-use sysinfo::{System, MemoryRefreshKind};
+use sysinfo::MemoryRefreshKind;
 use tokio::io::AsyncReadExt;
 
 /*
@@ -116,9 +116,10 @@ impl GpuInfo {
             .arg("-q")
             .arg("-x")
             .stdout(std::process::Stdio::piped())
-            .spawn() else {
-				return None;
-			};
+            .spawn()
+        else {
+            return None;
+        };
 
         let stdout = cmd.stdout.take().unwrap();
         let mut stdout_reader = tokio::io::BufReader::new(stdout);

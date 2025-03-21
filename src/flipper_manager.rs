@@ -1,6 +1,5 @@
-use btleplug::api::{Central, CentralEvent, Manager as _, Peripheral as _, ScanFilter};
+use btleplug::api::{Central, Manager as _, Peripheral as _};
 use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
-use futures::stream::StreamExt;
 use uuid::Uuid;
 
 pub const FLIPPER_CHARACTERISTIC_UUID: Uuid =
@@ -16,7 +15,7 @@ pub async fn get_central(manager: &Manager) -> Adapter {
         .unwrap()
 }
 
-pub async fn get_flipper(central: &Adapter, id: &PeripheralId, flipper_name: String) -> Option<Peripheral> {
+pub async fn get_flipper(central: &Adapter, id: &PeripheralId) -> Option<Peripheral> {
     for p in central
         .peripherals()
         .await
@@ -30,7 +29,7 @@ pub async fn get_flipper(central: &Adapter, id: &PeripheralId, flipper_name: Str
             .unwrap()
             .local_name
             .iter()
-            .any(|name| name.contains(&flipper_name))
+            .any(|name| name.contains("PC Mon"))
         {
             return Some(p.clone());
         }
