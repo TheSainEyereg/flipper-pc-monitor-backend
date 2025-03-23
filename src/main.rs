@@ -1,5 +1,5 @@
 use btleplug::api::{Central, CentralEvent, Peripheral as _, ScanFilter};
-use btleplug::platform::{Manager, Peripheral};
+use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::error::Error;
@@ -9,6 +9,7 @@ mod helpers;
 mod system_info;
 
 async fn data_sender(flipper: Peripheral) {
+    let id = flipper.id();
     let chars = flipper.characteristics();
     let cmd_char = match chars
         .iter()
@@ -16,10 +17,10 @@ async fn data_sender(flipper: Peripheral) {
     {
         Some(c) => c,
         None => {
-            return println!("Failed to find characteristic");
+            return println!("[{}] Failed to find characteristic", id.to_string());
         }
     };
-    println!("Now you can launch PC Monitor app on your Flipper");
+    println!("[{}] Sending data...", id.to_string());
 
     // Reuse system variable in loop (small performance and RAM boost)
     let mut system_info = sysinfo::System::new_all();
@@ -28,16 +29,28 @@ async fn data_sender(flipper: Peripheral) {
         let systeminfo_bytes = bincode::serialize(&systeminfo).unwrap();
         // println!("Writing {:?} to Flipper", systeminfo_bytes);
 
-        flipper
+        if let Err(e) = flipper
             .write(
                 cmd_char,
                 &systeminfo_bytes,
                 btleplug::api::WriteType::WithoutResponse,
             )
             .await
-            .expect("Failed to write to Flipper");
+        {
+            println!("[{}] Failed to write: {}", id.to_string(), e);
+        };
 
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+}
+
+async fn reconnect_thread(central: Adapter, id: PeripheralId) {
+    loop {
+        if let Some(flipper) = flipper_manager::get_flipper(&central, &id).await {
+            let _ = flipper.connect().await;
+        };
+
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     }
 }
 
@@ -50,45 +63,63 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let central = flipper_manager::get_central(&manager).await;
     println!("Found {:?} adapter", central.adapter_info().await.unwrap());
-    println!();
 
     let mut events = central.events().await?;
 
-    println!("Scanning...");
+    println!("Scanning... Launch PC Monitor app on Flipper");
     central.start_scan(ScanFilter::default()).await?;
 
-    let mut workers = HashMap::new();
+    let mut data_workers: HashMap<PeripheralId, tokio::task::JoinHandle<()>> = HashMap::new();
+    let mut reconnect_workers: HashMap<PeripheralId, tokio::task::JoinHandle<()>> = HashMap::new();
 
     while let Some(event) = events.next().await {
         match event {
             CentralEvent::DeviceDiscovered(id) => {
-                // println!("Device Discovered: {}", &id.to_string());
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
-                    println!("Connecting to Flipper {}", &id.to_string());
-                    match flp.connect().await {
-                        Err(_) => println!("Failed to connect to Flipper {}", id.to_string()),
-                        _ => {}
+                    println!("[{}] Connecting to Flipper", &id.to_string());
+                    if let Err(e) = flp.connect().await {
+                        println!(
+                            "[{}] Failed to connect to Flipper: {}",
+                            id.to_string(),
+                            e.to_string()
+                        );
                     }
                 }
             }
             CentralEvent::DeviceConnected(id) => {
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     flp.discover_services().await?;
-                    println!("Connected to Flipper {}", &id.to_string());
+                    println!("[{}] Connected to Flipper", &id.to_string());
 
-                    workers.insert(id, tokio::spawn(data_sender(flp)));
+                    data_workers.insert(id.clone(), tokio::spawn(data_sender(flp)));
                 };
-            }
-            CentralEvent::DeviceDisconnected(id) => {
-                match workers.get(&id) {
+
+                match reconnect_workers.get(&id) {
                     Some(worker) => {
                         worker.abort();
-                        println!("Disconnected from Flipper {}", &id.to_string());
+                        reconnect_workers.remove(&id);
+                    }
+                    None => {}
+                }
+            }
+            CentralEvent::DeviceDisconnected(id) => {
+                match data_workers.get(&id) {
+                    Some(worker) => {
+                        worker.abort();
+                        println!(
+                            "[{}] Disconnected from Flipper. Waiting for reconnection",
+                            &id.to_string()
+                        );
 
-                        workers.remove(&id);
+                        data_workers.remove(&id);
                     }
                     None => {}
                 };
+
+                reconnect_workers.insert(
+                    id.clone(),
+                    tokio::spawn(reconnect_thread(central.clone(), id)),
+                );
             }
             _ => {}
         }
