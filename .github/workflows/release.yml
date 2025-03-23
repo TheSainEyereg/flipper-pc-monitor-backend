@@ -1,4 +1,4 @@
-name: Build release
+name: Build Release
 on:
   release:
     types: [published]
@@ -17,16 +17,13 @@ jobs:
       run: sudo apt install libdbus-1-dev
     - name: Build
       run: cargo build --release
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: flipper-pc-monitor-backend
-        path: target/release/flipper-pc-monitor-backend
-    - name: Release
+    - name: Move binary
+      run: mv target/release/flipper-pc-monitor-backend flipper-pc-monitor-linux64
+    - name: Upload release
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: target/release/flipper-pc-monitor-backend
+        files: flipper-pc-monitor-linux64
 
   build-windows:
     runs-on: windows-latest
@@ -36,13 +33,10 @@ jobs:
       run: rustup override set nightly
     - name: Build
       run: cargo build --release
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: flipper-pc-monitor-backend.exe
-        path: target/release/flipper-pc-monitor-backend.exe
-    - name: Release
+    - name: Move binary
+      run: mv target/release/flipper-pc-monitor-backend.exe flipper-pc-monitor-windows64.exe
+    - name: Upload release
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: target/release/flipper-pc-monitor-backend.exe
+        files: flipper-pc-monitor-windows64.exe
