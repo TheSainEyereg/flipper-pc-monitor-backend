@@ -1,4 +1,4 @@
-use crate::helpers::{avg_vecu32, nvd_r2u32, pop_4u8};
+use crate::helpers::{avg_vecu32, nvd_r2u64, pop_4u8};
 use serde::Serialize;
 use sysinfo::MemoryRefreshKind;
 use tokio::io::AsyncReadExt;
@@ -29,7 +29,7 @@ pub struct SystemInfo {
 }
 
 impl SystemInfo {
-    fn get_unit(exp: u8) -> String {
+    fn get_unit(exp: u32) -> String {
         match exp {
             0 => "B",
             1 => "KB",
@@ -41,35 +41,33 @@ impl SystemInfo {
         .to_owned()
     }
 
+    fn get_exp(num: u64, base: u64) -> u32 {
+        match num {
+            x if x > u64::pow(base, 4) => 4,
+            x if x > u64::pow(base, 3) => 3,
+            x if x > u64::pow(base, 2) => 2,
+            x if x > base => 1,
+            _ => 0,
+        }
+    }
+
     pub async fn get_system_info(system_info: &mut sysinfo::System) -> Self {
         // Need to refresh only CPU and RAM => big boost when combined with reusing system_info
         // system_info.refresh_all();
         system_info.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
-        let base: u64 = 1024;
+        let base = 1024;
 
         let ram_max = system_info.total_memory();
-        let ram_exp: u8 = match ram_max {
-            x if x > u64::pow(base, 4) => 4,
-            x if x > u64::pow(base, 3) => 3,
-            x if x > u64::pow(base, 2) => 2,
-            x if x > base => 1,
-            _ => 0,
-        };
+        let ram_exp = Self::get_exp(ram_max, base);
 
         let gpu_info = GpuInfo::get_gpu_info().await;
-        let vram_mult: u64 = u64::pow(base, 2); // MiB
+        let vram_mult = u64::pow(base, 2); // MiB
 
         let vram_max = match &gpu_info {
-            Some(gi) => nvd_r2u32(&gi.vram_max) as u64 * vram_mult,
+            Some(gi) => gi.vram_max * vram_mult,
             None => 0,
         };
-        let vram_exp: u8 = match vram_max {
-            x if x > u64::pow(base, 4) => 4,
-            x if x > u64::pow(base, 3) => 3,
-            x if x > u64::pow(base, 2) => 2,
-            x if x > base => 1,
-            _ => 0,
-        };
+        let vram_exp = Self::get_exp(vram_max, base);
 
         // Refresh only CPU usage before reading
         system_info.refresh_cpu_usage();
@@ -82,18 +80,17 @@ impl SystemInfo {
                     .collect(),
             ) as u8,
             // cpu_usage: system_info.cpus().first().unwrap().cpu_usage() as u8,
-            ram_max: (ram_max as f64 / u64::pow(base, ram_exp as u32) as f64 * 10.0) as u16,
+            ram_max: (ram_max as f64 / u64::pow(base, ram_exp) as f64 * 10.0) as u16,
             ram_usage: (system_info.used_memory() as f64 / ram_max as f64 * 100.0) as u8,
             ram_unit: pop_4u8(Self::get_unit(ram_exp).as_bytes()),
             gpu_usage: match &gpu_info {
-                Some(gi) => nvd_r2u32(&gi.gpu_usage) as u8,
+                Some(gi) => gi.gpu_usage as u8,
                 None => u8::MAX,
             },
-            vram_max: (vram_max as f64 / u64::pow(base, vram_exp as u32) as f64 * 10.0) as u16,
+            vram_max: (vram_max as f64 / u64::pow(base, vram_exp) as f64 * 10.0) as u16,
             vram_usage: match &gpu_info {
                 Some(gi) => {
-                    (nvd_r2u32(&gi.vram_used) as f64 * vram_mult as f64 / vram_max as f64 * 100.0)
-                        as u8
+                    (gi.vram_used as f64 * vram_mult as f64 / vram_max as f64 * 100.0) as u8
                 }
                 None => u8::MAX,
             },
@@ -104,9 +101,9 @@ impl SystemInfo {
 
 #[derive(Serialize, Debug, Clone)]
 pub struct GpuInfo {
-    pub gpu_usage: String,
-    pub vram_max: String,
-    pub vram_used: String,
+    pub gpu_usage: u64,
+    pub vram_max: u64,
+    pub vram_used: u64,
 }
 
 impl GpuInfo {
@@ -131,10 +128,21 @@ impl GpuInfo {
         match xmltojson::to_json(&mut_stdout) {
             Ok(json) => {
                 let g = json["nvidia_smi_log"]["gpu"].to_owned();
+
+                let Some(gpu_usage) = nvd_r2u64(g["utilization"]["gpu_util"].to_string()) else {
+                    return None;
+                };
+                let Some(vram_max) = nvd_r2u64(g["fb_memory_usage"]["total"].to_string()) else {
+                    return None;
+                };
+                let Some(vram_used) = nvd_r2u64(g["fb_memory_usage"]["used"].to_string()) else {
+                    return None;
+                };
+
                 Some(GpuInfo {
-                    vram_max: (g["fb_memory_usage"]["total"].to_string()),
-                    gpu_usage: (g["utilization"]["gpu_util"].to_string()),
-                    vram_used: (g["fb_memory_usage"]["used"].to_string()),
+                    gpu_usage,
+                    vram_max,
+                    vram_used,
                 })
             }
             Err(_) => None,
