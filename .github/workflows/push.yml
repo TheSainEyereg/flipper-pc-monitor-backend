@@ -5,6 +5,21 @@ on:
       - master
 
 jobs:
+  formating_code:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    name: Formating code
+    steps:
+    - uses: actions/checkout@v4
+    - name: Formating code
+      run: cargo fmt
+    - name: Commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add .
+        git commit -m "Auto format code" || echo "No changes to commit"
+        git push || echo "No changes to push"
   build-linux:
     runs-on: ubuntu-latest
     steps:
