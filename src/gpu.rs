@@ -42,6 +42,8 @@ impl GpuType {
 
         tokio::process::Command::new(which)
             .arg(name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .status()
             .await
             .map(|status| status.success())
