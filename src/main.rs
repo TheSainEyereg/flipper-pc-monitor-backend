@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::error::Error;
 
 mod flipper_manager;
+mod gpu;
 mod helpers;
 mod system_info;
 
