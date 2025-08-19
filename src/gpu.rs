@@ -63,7 +63,6 @@ mod tests {
     #[tokio::test]
     async fn test_get_gpu_info() {
         let info = GpuInfo::get_gpu_info().await;
-        println!("info: {:#?}", info);
         assert!(info.is_some());
     }
 
