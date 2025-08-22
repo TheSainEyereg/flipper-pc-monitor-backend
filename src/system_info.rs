@@ -1,20 +1,9 @@
-use crate::helpers::{avg_vecu32, nvd_r2u64, pop_4u8};
+use crate::{
+    gpu::GpuInfo,
+    helpers::{avg_vecu32, pop_4u8},
+};
 use serde::Serialize;
 use sysinfo::MemoryRefreshKind;
-use tokio::io::AsyncReadExt;
-
-/*
-typedef struct {
-    uint8_t cpu_usage;
-    uint16_t ram_max;
-    uint8_t ram_usage;
-    char ram_unit[4];
-    uint8_t gpu_usage;
-    uint16_t vram_max;
-    uint8_t vram_usage;
-    char vram_unit[4];
-} DataStruct;
-*/
 
 #[derive(Serialize, Debug, Clone)]
 pub struct SystemInfo {
@@ -95,57 +84,6 @@ impl SystemInfo {
                 None => u8::MAX,
             },
             vram_unit: pop_4u8(Self::get_unit(vram_exp).as_bytes()),
-        }
-    }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct GpuInfo {
-    pub gpu_usage: u64,
-    pub vram_max: u64,
-    pub vram_used: u64,
-}
-
-impl GpuInfo {
-    pub async fn get_gpu_info() -> Option<Self> {
-        // TODO: AMD support
-        let Ok(mut cmd) = tokio::process::Command::new("nvidia-smi")
-            .arg("-q")
-            .arg("-x")
-            .stdout(std::process::Stdio::piped())
-            .spawn()
-        else {
-            return None;
-        };
-
-        let stdout = cmd.stdout.take().unwrap();
-        let mut stdout_reader = tokio::io::BufReader::new(stdout);
-        let mut mut_stdout = String::new();
-        if stdout_reader.read_to_string(&mut mut_stdout).await.is_err() {
-            return None;
-        };
-
-        match xmltojson::to_json(&mut_stdout) {
-            Ok(json) => {
-                let g = json["nvidia_smi_log"]["gpu"].to_owned();
-
-                let Some(gpu_usage) = nvd_r2u64(g["utilization"]["gpu_util"].to_string()) else {
-                    return None;
-                };
-                let Some(vram_max) = nvd_r2u64(g["fb_memory_usage"]["total"].to_string()) else {
-                    return None;
-                };
-                let Some(vram_used) = nvd_r2u64(g["fb_memory_usage"]["used"].to_string()) else {
-                    return None;
-                };
-
-                Some(GpuInfo {
-                    gpu_usage,
-                    vram_max,
-                    vram_used,
-                })
-            }
-            Err(_) => None,
         }
     }
 }
