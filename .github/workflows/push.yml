@@ -10,46 +10,79 @@ jobs:
     permissions: write-all
     name: Formating code
     steps:
-    - uses: actions/checkout@v4
-    - name: Formating code
-      run: cargo fmt
-    - name: Commit changes
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add .
-        git commit -m "Auto format code" || echo "No changes to commit"
-        git push || echo "No changes to push"
+      - uses: actions/checkout@v4
+      - name: Formating code
+        run: cargo fmt
+      - name: Commit changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git commit -m "Auto format code" || echo "No changes to commit"
+          git push || echo "No changes to push"
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Temporarily modify the rust toolchain version
-      run: rustup override set nightly
-    - name: Install dependencies
-      run: sudo apt install libdbus-1-dev
-    - name: Build
-      run: cargo build --release
-    - name: Move binary
-      run: mv target/release/flipper-pc-monitor-backend fpcm-linux-x86_64
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Linux build
-        path: fpcm-linux-x86_64
+      - uses: actions/checkout@v4
+      - name: Temporarily modify the rust toolchain version
+        run: rustup override set nightly
+      - name: Install dependencies
+        run: sudo apt install libdbus-1-dev
+      - name: Build
+        run: cargo build --release
+      - name: Move binary
+        run: mv target/release/flipper-pc-monitor-backend fpcm-linux-x86_64
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux build
+          path: fpcm-linux-x86_64
 
   build-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Temporarily modify the rust toolchain version
-      run: rustup override set nightly
-    - name: Build
-      run: cargo build --release
-    - name: Move binary
-      run: mv target/release/flipper-pc-monitor-backend.exe fpcm-windows-x86_64.exe
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Windows build
-        path: fpcm-windows-x86_64.exe
+      - uses: actions/checkout@v4
+      - name: Temporarily modify the rust toolchain version
+        run: rustup override set nightly
+      - name: Build
+        run: cargo build --release
+      - name: Move binary
+        run: mv target/release/flipper-pc-monitor-backend.exe fpcm-windows-x86_64.exe
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows build
+          path: fpcm-windows-x86_64.exe
+
+  build-macos-intel:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Temporarily modify the rust toolchain version
+        run: rustup override set nightly
+      - name: Build
+        run: cargo build --release
+      - name: Move binary
+        run: mv target/release/flipper-pc-monitor-backend fpcm-macos-x86_64
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS Intel build
+          path: fpcm-macos-x86_64
+
+  build-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Temporarily modify the rust toolchain version
+        run: rustup override set nightly
+      - name: Build
+        run: cargo build --release
+      - name: Move binary
+        run: mv target/release/flipper-pc-monitor-backend fpcm-macos-arm64
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS ARM build
+          path: fpcm-macos-arm64

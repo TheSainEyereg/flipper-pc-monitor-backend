@@ -17,10 +17,10 @@ async fn data_sender(flipper: Peripheral) {
     {
         Some(c) => c,
         None => {
-            return println!("[{}] Failed to find characteristic", id.to_string());
+            return println!("[{id}] Failed to find characteristic");
         }
     };
-    println!("[{}] Sending data...", id.to_string());
+    println!("[{id}] Sending data...");
 
     // Reuse system variable in loop (small performance and RAM boost)
     let mut system_info = sysinfo::System::new_all();
@@ -37,7 +37,7 @@ async fn data_sender(flipper: Peripheral) {
             )
             .await
         {
-            println!("[{}] Failed to write: {}", id.to_string(), e);
+            println!("[{id}] Failed to write: {e}");
         };
 
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -78,42 +78,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     println!("[{}] Connecting to Flipper", &id.to_string());
                     if let Err(e) = flp.connect().await {
-                        println!(
-                            "[{}] Failed to connect to Flipper: {}",
-                            id.to_string(),
-                            e.to_string()
-                        );
+                        println!("[{id}] Failed to connect to Flipper: {e}");
                     }
                 }
             }
             CentralEvent::DeviceConnected(id) => {
                 if let Some(flp) = flipper_manager::get_flipper(&central, &id).await {
                     flp.discover_services().await?;
-                    println!("[{}] Connected to Flipper", &id.to_string());
+                    println!("[{id}] Connected to Flipper");
 
                     data_workers.insert(id.clone(), tokio::spawn(data_sender(flp)));
                 };
 
-                match reconnect_workers.get(&id) {
-                    Some(worker) => {
-                        worker.abort();
-                        reconnect_workers.remove(&id);
-                    }
-                    None => {}
+                if let Some(worker) = reconnect_workers.get(&id) {
+                    worker.abort();
+                    reconnect_workers.remove(&id);
                 }
             }
             CentralEvent::DeviceDisconnected(id) => {
-                match data_workers.get(&id) {
-                    Some(worker) => {
-                        worker.abort();
-                        println!(
-                            "[{}] Disconnected from Flipper. Waiting for reconnection",
-                            &id.to_string()
-                        );
+                if let Some(worker) = data_workers.get(&id) {
+                    worker.abort();
+                    println!("[{id}] Disconnected from Flipper. Waiting for reconnection");
 
-                        data_workers.remove(&id);
-                    }
-                    None => {}
+                    data_workers.remove(&id);
                 };
 
                 reconnect_workers.insert(

@@ -11,7 +11,7 @@ pub async fn get_central(manager: &Manager) -> Adapter {
         .await
         .unwrap()
         .into_iter()
-        .nth(0)
+        .next()
         .unwrap()
 }
 

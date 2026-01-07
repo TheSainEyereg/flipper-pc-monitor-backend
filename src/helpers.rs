@@ -11,11 +11,8 @@ pub fn nvd_r2u64(res: String) -> Option<u64> {
     chars.next();
     chars.next_back();
 
-    match chars.as_str().split(" ").collect::<Vec<&str>>()[0]
+    chars.as_str().split(" ").collect::<Vec<&str>>()[0]
         .trim()
         .parse()
-    {
-        Ok(v) => Some(v),
-        _ => None,
-    }
+        .ok()
 }
