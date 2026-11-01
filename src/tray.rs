@@ -5,6 +5,8 @@
 //! of the taskbar as well. A left click on the tray icon shows the window
 //! again, a right click opens a small context menu (Show / Exit). The tray
 //! icon is the qFlipper icon embedded into the executable by build.rs.
+//! Starting a second copy of the app brings the running instance to the
+//! front and exits the new copy.
 //!
 //! Other platforms: no-op.
 
@@ -29,6 +31,12 @@ mod win {
     const SW_HIDE: i32 = 0x00;
     const SW_RESTORE: i32 = 0x09;
 
+    const ERROR_ALREADY_EXISTS: u32 = 183;
+
+    /// Title of the console window; doubles as the handle a second instance
+    /// uses to find the running one
+    const APP_WINDOW_TITLE: &str = "Flipper PC Monitor";
+
     /// Resource ID of the qFlipper icon embedded into the exe by build.rs
     /// (`winresource::set_icon` always uses ID 1)
     const APP_ICON_ID: u32 = 1;
@@ -49,6 +57,10 @@ mod win {
     const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
     static TRAY_HWND: AtomicUsize = AtomicUsize::new(0);
+
+    /// Handle of the single-instance mutex (kept open for the whole lifetime
+    /// of the process so the mutex stays owned)
+    static SINGLE_INSTANCE_MUTEX: AtomicUsize = AtomicUsize::new(0);
 
     type WndProc =
         unsafe extern "system" fn(hwnd: *mut c_void, msg: u32, wparam: usize, lparam: isize) -> isize;
@@ -110,6 +122,8 @@ mod win {
         fn IsIconic(hwnd: *mut c_void) -> i32;
         fn ShowWindow(hwnd: *mut c_void, n_cmd_show: i32) -> i32;
         fn SetForegroundWindow(hwnd: *mut c_void) -> i32;
+        fn SetConsoleTitleW(title: *const u16) -> i32;
+        fn FindWindowW(class: *const u16, name: *const u16) -> *mut c_void;
         fn GetModuleHandleW(name: *const u16) -> *mut c_void;
         fn RegisterClassExW(class: *const WndClassExW) -> u16;
         fn CreateWindowExW(
@@ -161,8 +175,25 @@ mod win {
         fn LoadIconW(instance: *mut c_void, icon_name: u32) -> *mut c_void;
     }
 
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn CreateMutexW(attrs: *const c_void, initial_owner: i32, name: *const u16) -> *mut c_void;
+        fn GetLastError() -> u32;
+    }
+
     /// Starts the tray thread. Must be called once at startup.
     pub(super) fn init() {
+        // A second copy exits (after bringing the running instance forward)
+        unsafe {
+            ensure_single_instance();
+        }
+
+        unsafe {
+            // Give the console window a known title so a second instance can
+            // find it
+            SetConsoleTitleW(wide(APP_WINDOW_TITLE).as_ptr());
+        }
+
         // Start in the tray: hide the console window right away, the app
         // is reached from the system tray icon from here on
         unsafe {
@@ -181,6 +212,36 @@ mod win {
         }
     }
 
+    /// Enforces single-instance behavior. If another copy of this app is
+    /// already running, restores and foregrounds its window and exits this
+    /// process. Returns normally when this is the first instance.
+    unsafe fn ensure_single_instance() {
+        let name = wide("Local\\FlipperPcMonitor");
+        let mutex = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
+        // Must be read before any other Win32 call
+        let error = GetLastError();
+        if mutex.is_null() {
+            // No mutex available; don't block startup over it
+            return;
+        }
+        SINGLE_INSTANCE_MUTEX.store(mutex as usize, Ordering::Relaxed);
+        if error != ERROR_ALREADY_EXISTS {
+            return;
+        }
+
+        // A second copy: show the running instance, then exit
+        let other = FindWindowW(std::ptr::null(), wide(APP_WINDOW_TITLE).as_ptr());
+        if !other.is_null() {
+            ShowWindow(other, SW_RESTORE);
+            SetForegroundWindow(other);
+        }
+        let console = GetConsoleWindow();
+        if !console.is_null() {
+            ShowWindow(console, SW_HIDE);
+        }
+        std::process::exit(0);
+    }
+
     fn wide(s: &str) -> Vec<u16> {
         s.encode_utf16()
             .chain(std::iter::once(0))
@@ -195,7 +256,7 @@ mod win {
     ) -> isize {
         match msg {
             WM_TRAY_ICON => match lparam as u32 {
-                // Left click: bring the window back (restore + maximize)
+                // Left click: bring the window back (restore, no maximize)
                 WM_LBUTTONUP => show_console_window(),
                 // Right click: context menu
                 WM_RBUTTONUP => show_tray_menu(hwnd),
