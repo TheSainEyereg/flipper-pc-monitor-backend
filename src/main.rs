@@ -7,6 +7,7 @@ use std::error::Error;
 mod flipper_manager;
 mod helpers;
 mod system_info;
+mod tray;
 
 async fn data_sender(flipper: Peripheral) {
     let id = flipper.id();
@@ -58,6 +59,9 @@ async fn reconnect_thread(central: Adapter, id: PeripheralId) {
 async fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
     // std::env::set_var("RUST_BACKTRACE", "full");
+
+    // System tray: minimizing the window moves it to the tray (Windows only)
+    tray::init_tray();
 
     let manager = Manager::new().await?;
 
